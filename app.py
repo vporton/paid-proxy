@@ -105,8 +105,8 @@ def proxy_handler(p):
                     remainder = 100000.0  # FIXME
                     if v <= remainder:
                         txn.put(account, struct.pack('f', remainder - v))
-                        upstream_path = re.sub(r"^/proxy/", "", request.full_path)
             if v <= remainder:
+                upstream_path = re.sub(r"^/proxy/", "", request.full_path)
                 return serve_proxied(upstream_path)
             break
     return "Path not found."
