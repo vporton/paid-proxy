@@ -24,8 +24,8 @@ accounts_db = env.open_db(b'accounts', create=True)
 def serve_proxied(upstream_path):
     request_headers = dict(request.headers)
     filter_request_headers(request_headers)
-    r = make_request(config['upstreamPrefix'] + upstream_path + f"&key={config['upstreamKey']}", request.method, headers=request_headers,
-                     data=request.get_data())
+    r = make_request(config['upstreamPrefix'] + upstream_path, request.method, params={'key': config['upstreamKey']},
+                     headers=request_headers, data=request.get_data())
     response_headers = dict(r.raw.headers)
     filter_response_headers(response_headers)
 
@@ -65,11 +65,11 @@ def filter_response_headers(headers):
     return headers
 
 
-def make_request(url, method, headers={}, data=None):
+def make_request(url, method, headers={}, data=None, params=None):
     try:
         # LOG.debug("Sending %s %s with headers: %s and data %s", method, url, headers, data)
         print(url)
-        return requests.request(method, url, stream=True,
+        return requests.request(method, url, params=params, stream=True,
                                 headers=headers,
                                 allow_redirects=False,
                                 data=data)
