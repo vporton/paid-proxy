@@ -8,6 +8,7 @@ from flask_compress import Compress
 from flask_lambda import FlaskLambda
 # from flask import Flask
 from flask import request
+from flufl.lock import Lock
 
 app = FlaskLambda(__name__)
 # app = Flask(__name__)
@@ -16,9 +17,21 @@ Compress(app)
 with open("config.json") as config_file:
     config = json.load(config_file)
 
-env = lmdb.open(f"{config['statePath']}", max_dbs=10, map_size=200*1024*1024*1024)
-accounts_db = env.open_db(b'accounts', create=True)
 
+class OurDB:
+    def __enter__(self):
+        # NFS filesystem safe lock
+        self.lock = Lock(f"{config['statePath']}/mylock")
+        self.lock.lock(timeout=4)  # FIXME: Ensure, it is not unlocked in the middle.
+
+        self.env = lmdb.open(config['statePath'], max_dbs=10, map_size=200*1024*1024*1024)
+        self.accounts_db = self.env.open_db(b'accounts', create=True)
+
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.env.close()
+        self.lock.unlock()
 
 # Following https://gist.github.com/questjay/3f858c2fea1731d29ea20cd5cb444e30#file-flask-server-proxy
 def serve_proxied(upstream_path):
@@ -82,17 +95,19 @@ def proxy_handler(p):
     account = account.encode('utf-8')  # hack
     for k, v in config['costs'].items():
         if p.startswith(k):
-            with env.begin(write=True) as txn:
-                # remainder = txn.get(account)
-                # if remainder is None:
-                #     remainder = 0.0
-                # else:
-                #     remainder = struct.unpack('f', remainder)  # float
-                remainder = 100000.0  # FIXME
-                if v <= remainder:
-                    txn.put(account, struct.pack('f', remainder - v))
-                    upstream_path = re.sub(r"^/proxy/", "", request.full_path)
-                    return serve_proxied(upstream_path)
+            with OurDB() as our_db:
+                with our_db.env.begin(our_db.accounts_db, write=True) as txn:  # TODO: buffers=True allowed?
+                    # remainder = txn.get(account)
+                    # if remainder is None:
+                    #     remainder = 0.0
+                    # else:
+                    #     remainder = struct.unpack('f', remainder)  # float
+                    remainder = 100000.0  # FIXME
+                    if v <= remainder:
+                        txn.put(account, struct.pack('f', remainder - v))
+                        upstream_path = re.sub(r"^/proxy/", "", request.full_path)
+            if v <= remainder:
+                return serve_proxied(upstream_path)
             break
     return "Path not found."
 

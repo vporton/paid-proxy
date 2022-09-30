@@ -4,3 +4,4 @@ flask-lambda
 requests
 lmdb
 flask-compress
+flufl.lock
