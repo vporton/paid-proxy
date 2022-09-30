@@ -30,7 +30,6 @@ def serve_proxied(upstream_path):
     filter_response_headers(response_headers)
 
     def generate():
-        # for chunk in r.raw.stream(decode_content=True):
         for chunk in r.iter_content(chunk_size=1024):
             yield chunk
 
