@@ -4,12 +4,14 @@ import struct
 
 import lmdb
 import requests as requests
+from flask_compress import Compress
 from flask_lambda import FlaskLambda
 # from flask import Flask
 from flask import request
 
 app = FlaskLambda(__name__)
 # app = Flask(__name__)
+Compress(app)
 
 with open("config.json") as config_file:
     config = json.load(config_file)
@@ -48,7 +50,7 @@ def filter_request_headers(headers):
 def filter_response_headers(headers):
     # http://tools.ietf.org/html/rfc2616#section-13.5.1
     hop_by_hop = ['connection', 'keep-alive', 'te', 'trailers', 'transfer-encoding', 'upgrade',
-                  'content-length']  # my addition - Victor Porton
+                  'content-length', 'content-encoding']  # my addition - Victor Porton
     entries_to_remove = [k for k in headers.keys() if k.lower() in hop_by_hop]
     for k in entries_to_remove:
         del headers[k]
