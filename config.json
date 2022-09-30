@@ -1,0 +1,8 @@
+{
+  "upstreamPrefix": "https://maps.googleapis.com",
+  "costs": {
+    "https://maps.googleapis.com/maps/api/place/autocomplete/": 0.00283,
+    "https://maps.googleapis.com/maps/api/place/details/": 0.017,
+    "https://maps.googleapis.com/maps/api/place/nearbysearch/": 0.017
+  }
+}
