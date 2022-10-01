@@ -4,10 +4,11 @@ import struct
 
 import lmdb
 import requests as requests
+import stripe
 from flask_compress import Compress
 from flask_lambda import FlaskLambda
 # from flask import Flask
-from flask import request
+from flask import request, jsonify
 from flufl.lock import Lock
 
 app = FlaskLambda(__name__)
@@ -32,6 +33,7 @@ class OurDB:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.env.close()
         self.lock.unlock()
+
 
 # Following https://gist.github.com/questjay/3f858c2fea1731d29ea20cd5cb444e30#file-flask-server-proxy
 def serve_proxied(upstream_path):
@@ -110,6 +112,39 @@ def proxy_handler(p):
                 return serve_proxied(upstream_path)
             break
     return "Path not found."
+
+
+@app.route('/stripe_webhooks', methods=['POST'])
+def webhook():
+    event = None
+    payload = request.data
+    sig_header = request.headers['STRIPE_SIGNATURE']
+
+    try:
+        event = stripe.Webhook.construct_event(
+            payload, sig_header, config['stripe']['secret']
+        )
+    except ValueError as e:
+        # Invalid payload
+        raise e
+    except stripe.error.SignatureVerificationError as e:
+        # Invalid signature
+        raise e
+
+    # Handle the event
+    if event.type == 'payment_intent.succeeded':
+        amount = event['data']['object']['amount'] / 100
+        account = event['data']['metadata']['account']
+        with OurDB() as our_db:
+            with our_db.env.begin(our_db.accounts_db, write=True) as txn:  # TODO: buffers=True allowed?
+                remainder = txn.get(account)
+                if remainder is None:
+                    remainder = 0.0
+                else:
+                    remainder = struct.unpack('f', remainder)  # float
+                txn.put(account, struct.pack('f', remainder + amount))
+
+    return jsonify(success=True)
 
 
 if __name__ == '__main__':
