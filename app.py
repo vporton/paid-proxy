@@ -91,10 +91,8 @@ def make_request(url, method, headers={}, data=None, params=None):
         print(e)
 
 
-@app.route('/proxy/<path:p>', methods=['GET', 'POST'])
-def proxy_handler(p):
-    account = {k.lower(): v for k, v in request.headers.items()}['x-account-id']  # TODO: If the header is missing
-    account = account.encode('utf-8')  # hack
+@app.route('/proxy/<account>/<path:p>', methods=['GET', 'POST'])
+def proxy_handler(account, p):
     for k, v in config['costs'].items():
         if p.startswith(k):
             with OurDB() as our_db:
@@ -103,7 +101,7 @@ def proxy_handler(p):
                     # if remainder is None:
                     #     remainder = 0.0
                     # else:
-                    #     remainder = struct.unpack('f', remainder)  # float
+                    #     remainder = struct.unpack('f', remainder)[0]  # float
                     remainder = 100000.0  # FIXME
                     if v <= remainder:
                         txn.put(account, struct.pack('f', remainder - v))
@@ -112,6 +110,18 @@ def proxy_handler(p):
                 return serve_proxied(upstream_path)
             break
     return "Path not found."
+
+
+@app.route('/balance/<account>', methods=['GET'])
+def balance(account):
+    with OurDB() as our_db:
+        with our_db.env.begin(our_db.accounts_db, write=False) as txn:  # TODO: buffers=True allowed?
+            balance = txn.get(account.encode('utf-8'))
+            if balance is None:
+                balance = 0.0
+            else:
+                balance = struct.unpack('f', balance)[0]  # float
+            return str(balance)
 
 
 @app.route('/stripe_webhooks', methods=['POST'])
