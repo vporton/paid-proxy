@@ -4,36 +4,18 @@ import struct
 
 import lmdb
 import requests as requests
-import stripe
 from flask_compress import Compress
 from flask_lambda import FlaskLambda
 # from flask import Flask
 from flask import request, jsonify
 from flufl.lock import Lock
 
+import mystripe
+from common import OurDB, config
+
 app = FlaskLambda(__name__)
 # app = Flask(__name__)
 Compress(app)
-
-with open("config.json") as config_file:
-    config = json.load(config_file)
-
-
-class OurDB:
-    def __enter__(self):
-        # NFS filesystem safe lock
-        self.lock = Lock(f"{config['statePath']}/mylock")
-        self.lock.lock(timeout=4)  # FIXME: Ensure, it is not unlocked in the middle.
-
-        self.env = lmdb.open(config['statePath'], max_dbs=10, map_size=200*1024*1024*1024)
-        self.accounts_db = self.env.open_db(b'accounts', create=True)
-
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.env.close()
-        self.lock.unlock()
-
 
 # Following https://gist.github.com/questjay/3f858c2fea1731d29ea20cd5cb444e30#file-flask-server-proxy
 def serve_proxied(upstream_path):
@@ -122,39 +104,6 @@ def balance(account):
             else:
                 balance = struct.unpack('f', balance)[0]  # float
             return str(balance)
-
-
-@app.route('/stripe_webhooks', methods=['POST'])
-def webhook():
-    event = None
-    payload = request.data
-    sig_header = request.headers['STRIPE_SIGNATURE']
-
-    try:
-        event = stripe.Webhook.construct_event(
-            payload, sig_header, config['stripe']['secret']
-        )
-    except ValueError as e:
-        # Invalid payload
-        raise e
-    except stripe.error.SignatureVerificationError as e:
-        # Invalid signature
-        raise e
-
-    # Handle the event
-    if event.type == 'payment_intent.succeeded':
-        amount = event['data']['object']['amount'] / 100
-        account = event['data']['metadata']['account']
-        with OurDB() as our_db:
-            with our_db.env.begin(our_db.accounts_db, write=True) as txn:  # TODO: buffers=True allowed?
-                remainder = txn.get(account)
-                if remainder is None:
-                    remainder = 0.0
-                else:
-                    remainder = struct.unpack('f', remainder)  # float
-                txn.put(account, struct.pack('f', remainder + amount))
-
-    return jsonify(success=True)
 
 
 if __name__ == '__main__':
