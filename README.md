@@ -1,10 +1,14 @@
 # Paid Proxy
 
-Proxy intended for Google Maps that limit the quantity of requests
-accordingly the sum paid by the user through Stripe.
+Proxy intended for Google Maps that limits the quantity of requests
+accordingly the sum paid by the user through in-app purchases or Stripe.
 
-**Warning:** the support for in-app purchases is not yet debugged,
+**Warning:** The support for in-app purchases is not yet debugged,
 because Google is slow to answer bug reports and support requests.
+_(I am creating my first Android app and when I follow the Google help
+to sign my app for uploading to Google Play, it does not work, so
+I can't yet test in-app purchases. The bug was filed.)_
+Stripe support is not high priority, and it is therefore not tested, too.
 
 This app can be run on a server or (presumably less expensively) as
 an AWS lambda with DB stored in an EFS.
@@ -46,6 +50,8 @@ Then follow the example session below.
   }
 }
 ```
+
+Note that above we can specify `costs` above the Google costs, to have profit.
 
 ### Demo session
 
