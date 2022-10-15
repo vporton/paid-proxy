@@ -68,7 +68,7 @@ def filter_response_headers(headers):
 def make_request(url, method, headers={}, data=None, params=None):
     try:
         # LOG.debug("Sending %s %s with headers: %s and data %s", method, url, headers, data)
-        print(url)
+        print(f"Making request to {url}")
         return requests.request(method, url, params=params, stream=True,
                                 headers=headers,
                                 allow_redirects=False,
@@ -79,6 +79,7 @@ def make_request(url, method, headers={}, data=None, params=None):
 
 @app.route('/proxy/<account>/<path:p>', methods=['GET', 'POST'])
 def proxy_handler(account, p):
+    account = account.encode('utf-8')
     for k, v in config['costs'].items():
         if p.startswith(k):
             with OurDB() as our_db:
@@ -88,14 +89,15 @@ def proxy_handler(account, p):
                         remainder = 0.0
                     else:
                         remainder = struct.unpack('f', remainder)[0]  # float
-                    # remainder = 100000.0
                     if v <= remainder:
                         txn.put(account, struct.pack('f', remainder - v))
             if v <= remainder:
-                upstream_path = re.sub(r"^/proxy/", "", request.full_path)
+                upstream_path = re.sub(r"^/proxy/[^/]+/", "", request.full_path)
                 return serve_proxied(upstream_path)
+            else:
+                return ("Payment required", 402)
             break
-    return "Path not found."
+    return ("Path not found.", 404)
 
 
 @app.route('/balance/<account>', methods=['GET'])
