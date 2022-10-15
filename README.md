@@ -1,7 +1,7 @@
 # Paid Proxy
 
-Proxy intended for Google Maps that limits the quantity of requests
-accordingly the sum paid by the user through in-app purchases or Stripe.
+## What it does
+It's a reverse proxy that limits an amount of requests accordingly to specified price of every request. The accounts can be topped up by in-app purchases or Stripe.
 
 **Warning:** The support for in-app purchases is not yet debugged,
 because Google is slow to answer bug reports and support requests.
@@ -10,8 +10,10 @@ to sign my app for uploading to Google Play, it does not work, so
 I can't yet test in-app purchases. The bug was filed.)_
 Stripe support is not high priority, and it is therefore not tested, too.
 
+## Running environment
+
 This app can be run on a server or (presumably less expensively) as
-an AWS lambda with DB stored in an EFS.
+an AWS Lambda with DB stored in an EFS.
 
 ## Testing the app
 
