@@ -2,9 +2,17 @@ import json
 import struct
 
 import lmdb
+from flask_compress import Compress
+from flask_lambda import FlaskLambda
+from flufl.lock import Lock
 
 with open("config.json") as config_file:
     config = json.load(config_file)
+
+
+app = FlaskLambda(__name__)
+# app = Flask(__name__)
+Compress(app)
 
 
 class OurDB:

@@ -1,7 +1,7 @@
 from flask import request, jsonify
 import stripe
 
-from common import fund_account, OurDB
+from common import fund_account, OurDB, app
 
 
 @app.route('/stripe_webhooks', methods=['POST'])
@@ -29,5 +29,3 @@ def stripe_webhook():
             fund_account(our_db, account, amount)
 
     return jsonify(success=True)
-
-

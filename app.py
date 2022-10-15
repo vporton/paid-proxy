@@ -2,20 +2,13 @@ import json
 import re
 import struct
 
-import lmdb
 import requests as requests
-from flask_compress import Compress
-from flask_lambda import FlaskLambda
-# from flask import Flask
 from flask import request, jsonify
-from flufl.lock import Lock
 
 import mystripe
-from common import OurDB, config
+import myplaymarket
+from common import OurDB, config, app, fund_account
 
-app = FlaskLambda(__name__)
-# app = Flask(__name__)
-Compress(app)
 
 # Following https://gist.github.com/questjay/3f858c2fea1731d29ea20cd5cb444e30#file-flask-server-proxy
 def serve_proxied(upstream_path):
@@ -33,6 +26,17 @@ def serve_proxied(upstream_path):
     out = app.response_class(generate(), headers=response_headers)
     out.status_code = r.status_code
     return out  # (r.text, r.status_code, headers)
+
+
+@app.route('/imitated-purchase/<account>/<float:amount>', methods=['POST'])
+def imitated_purchase(account, amount):
+    if request.headers['x-admin-secret'] != config['adminSecret']:
+        raise "Wrong admin secret"
+
+    with OurDB() as our_db:
+        fund_account(our_db, account.encode('utf-8'), amount)
+
+    return jsonify(success=True)
 
 
 def filter_request_headers(headers):
@@ -79,12 +83,12 @@ def proxy_handler(account, p):
         if p.startswith(k):
             with OurDB() as our_db:
                 with our_db.env.begin(our_db.accounts_db, write=True) as txn:  # TODO: buffers=True allowed?
-                    # remainder = txn.get(account)
-                    # if remainder is None:
-                    #     remainder = 0.0
-                    # else:
-                    #     remainder = struct.unpack('f', remainder)[0]  # float
-                    remainder = 100000.0  # FIXME
+                    remainder = txn.get(account)
+                    if remainder is None:
+                        remainder = 0.0
+                    else:
+                        remainder = struct.unpack('f', remainder)[0]  # float
+                    # remainder = 100000.0
                     if v <= remainder:
                         txn.put(account, struct.pack('f', remainder - v))
             if v <= remainder:
